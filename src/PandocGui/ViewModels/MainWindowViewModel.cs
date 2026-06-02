@@ -32,7 +32,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [Reactive] public partial string TargetPath { get; set; }
 
-    [Reactive] public partial string SourceFormat { get; set; }
+    [Reactive] public partial InputFormat SelectedInputFormat { get; set; }
     [Reactive] public partial OutputFormat SelectedOutputFormat { get; set; }
 
     [Reactive] public partial bool CustomHighlightThemeEnabled { get; set; }
@@ -52,7 +52,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [Reactive] public partial bool OpenFileOnCompletion { get; set; }
     public List<string> SupportedEngine { get; } = PdfEnginePandocCommandGenerator.supportedEngines.ToList();
     public List<string> InstalledFonts { get; }
-    public List<string> SupportedInputFormats { get; } = PandocFormats.InputFormats.ToList();
+    public List<InputFormat> SupportedInputFormats { get; } = PandocFormats.InputFormats.ToList();
     public List<OutputFormat> SupportedOutputFormats { get; } = PandocFormats.OutputFormats.ToList();
 
 
@@ -80,7 +80,7 @@ public partial class MainWindowViewModel : ViewModelBase
         CustomPdfEngineValue = "";
         Result = "";
         OpenFileOnCompletion = true;
-        SourceFormat = PandocFormats.DefaultInputFormat;
+        SelectedInputFormat = SupportedInputFormats[0];
         SelectedOutputFormat = SupportedOutputFormats[0];
         this.fileDialogService = fileDialogService;
         this.pandoc = pandoc;
@@ -110,7 +110,9 @@ public partial class MainWindowViewModel : ViewModelBase
             .Subscribe(path =>
             {
                 if (string.IsNullOrWhiteSpace(path)) return;
-                SourceFormat = PandocFormats.DetectInputFormat(path);
+                var detected = PandocFormats.DetectInputFormat(path);
+                SelectedInputFormat = SupportedInputFormats.FirstOrDefault(format => format.Format == detected)
+                                      ?? SupportedInputFormats[0];
                 SetTargetFromSource();
             });
         this.WhenAnyValue(x => x.SelectedOutputFormat)
@@ -164,14 +166,17 @@ public partial class MainWindowViewModel : ViewModelBase
             this.IsError = false;
             this.Result = "Success";
 
-            Process.Start(new ProcessStartInfo
+            if (OpenFileOnCompletion)
             {
-                FileName = RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? "xdg-open" : TargetPath,
-                Arguments = RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? TargetPath : "",
-                UseShellExecute = !RuntimeInformation.IsOSPlatform(OSPlatform.Linux),
-                CreateNoWindow = true,
-                WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
-            });
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? "xdg-open" : TargetPath,
+                    Arguments = RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? TargetPath : "",
+                    UseShellExecute = !RuntimeInformation.IsOSPlatform(OSPlatform.Linux),
+                    CreateNoWindow = true,
+                    WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+                });
+            }
         }
         catch (Exception e)
         {
@@ -187,7 +192,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             SourcePath = SourcePath,
             TargetPath = TargetPath,
-            SourceFormat = SourceFormat,
+            SourceFormat = SelectedInputFormat.Format,
             HighlightTheme = CustomHighlightThemeEnabled,
             HighlightThemeSource = CustomHighlightThemeSource,
             NumberedHeader = NumberedHeadersEnabled,
@@ -206,7 +211,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private async Task SearchInputFile()
     {
-        SourcePath = await fileDialogService.OpenFileAsync();
+        SourcePath = await fileDialogService.OpenFileAsync("Documents", PandocFormats.InputExtensions);
         Console.WriteLine($"Source path : {SourcePath}");
     }
 
@@ -220,7 +225,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         SourcePath = "";
         TargetPath = "";
-        SourceFormat = PandocFormats.DefaultInputFormat;
+        SelectedInputFormat = SupportedInputFormats[0];
         SelectedOutputFormat = SupportedOutputFormats[0];
         Result = "";
         IsError = false;
