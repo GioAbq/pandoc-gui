@@ -5,7 +5,10 @@ using System.Linq;
 
 namespace PandocGui.CliWrapper;
 
-public record OutputFormat(string DisplayName, string Extension);
+public record OutputFormat(string DisplayName, string Extension)
+{
+    public override string ToString() => DisplayName;
+}
 
 public static class PandocFormats
 {
