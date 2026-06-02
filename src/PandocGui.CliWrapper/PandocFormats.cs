@@ -5,6 +5,11 @@ using System.Linq;
 
 namespace PandocGui.CliWrapper;
 
+public record InputFormat(string DisplayName, string Format, IReadOnlyList<string> Extensions)
+{
+    public override string ToString() => DisplayName;
+}
+
 public record OutputFormat(string DisplayName, string Extension)
 {
     public override string ToString() => DisplayName;
@@ -14,45 +19,43 @@ public static class PandocFormats
 {
     public const string DefaultInputFormat = "markdown";
 
-    private static readonly IReadOnlyDictionary<string, string> InputFormatByExtension = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    // Ordered by real-world popularity, most common first.
+    public static IReadOnlyList<InputFormat> InputFormats { get; } = new List<InputFormat>
     {
-        [".md"] = "markdown",
-        [".markdown"] = "markdown",
-        [".txt"] = "markdown",
-        [".docx"] = "docx",
-        [".odt"] = "odt",
-        [".html"] = "html",
-        [".htm"] = "html",
-        [".rst"] = "rst",
-        [".tex"] = "latex",
-        [".latex"] = "latex",
-        [".epub"] = "epub",
-        [".rtf"] = "rtf",
-        [".org"] = "org",
-        [".json"] = "json",
-        [".csv"] = "csv",
-        [".ipynb"] = "ipynb",
-        [".typ"] = "typst",
-        [".textile"] = "textile",
-        [".wiki"] = "mediawiki",
+        new("Markdown", "markdown", new[] { ".md", ".markdown", ".txt" }),
+        new("Word (docx)", "docx", new[] { ".docx" }),
+        new("HTML", "html", new[] { ".html", ".htm" }),
+        new("LaTeX", "latex", new[] { ".tex", ".latex" }),
+        new("reStructuredText", "rst", new[] { ".rst" }),
+        new("EPUB", "epub", new[] { ".epub" }),
+        new("OpenDocument (odt)", "odt", new[] { ".odt" }),
+        new("Rich Text (rtf)", "rtf", new[] { ".rtf" }),
+        new("Org mode", "org", new[] { ".org" }),
+        new("Jupyter Notebook", "ipynb", new[] { ".ipynb" }),
+        new("Typst", "typst", new[] { ".typ" }),
+        new("MediaWiki", "mediawiki", new[] { ".wiki" }),
+        new("Textile", "textile", new[] { ".textile" }),
+        new("CSV", "csv", new[] { ".csv" }),
+        new("JSON", "json", new[] { ".json" }),
     };
 
-    public static IReadOnlyList<string> InputFormats { get; } =
-        InputFormatByExtension.Values.Distinct().OrderBy(format => format).ToList();
-
+    // Ordered by real-world popularity, most common first.
     public static IReadOnlyList<OutputFormat> OutputFormats { get; } = new List<OutputFormat>
     {
         new("PDF", ".pdf"),
         new("Word (docx)", ".docx"),
         new("HTML", ".html"),
-        new("EPUB", ".epub"),
         new("Markdown", ".md"),
-        new("LaTeX", ".tex"),
+        new("EPUB", ".epub"),
         new("OpenDocument (odt)", ".odt"),
-        new("RTF", ".rtf"),
+        new("Rich Text (rtf)", ".rtf"),
+        new("LaTeX", ".tex"),
         new("PowerPoint (pptx)", ".pptx"),
         new("Plain text", ".txt"),
     };
+
+    public static IReadOnlyList<string> InputExtensions { get; } =
+        InputFormats.SelectMany(format => format.Extensions).Distinct().ToList();
 
     public static string DetectInputFormat(string path)
     {
@@ -62,6 +65,19 @@ public static class PandocFormats
         }
 
         var extension = Path.GetExtension(path);
-        return InputFormatByExtension.TryGetValue(extension, out var format) ? format : DefaultInputFormat;
+        var match = InputFormats.FirstOrDefault(
+            format => format.Extensions.Contains(extension, StringComparer.OrdinalIgnoreCase));
+        return match?.Format ?? DefaultInputFormat;
+    }
+
+    public static bool IsSupportedInput(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        var extension = Path.GetExtension(path);
+        return InputExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
     }
 }
