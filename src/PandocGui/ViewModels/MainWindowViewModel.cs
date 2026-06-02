@@ -61,6 +61,10 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IClipboardService clipboard;
     private readonly ObservableAsPropertyHelper<bool> isExporting;
     public bool IsExporting => isExporting.Value;
+    private readonly ObservableAsPropertyHelper<bool> hasInput;
+    public bool HasInput => hasInput.Value;
+    private readonly ObservableAsPropertyHelper<bool> isStatusVisible;
+    public bool IsStatusVisible => isStatusVisible.Value;
 
     public MainWindowViewModel(IFileDialogService fileDialogService, IPandocCli pandoc,
         IDataDirectoryService dataDirectoryService, IClipboardService clipboard)
@@ -93,6 +97,13 @@ public partial class MainWindowViewModel : ViewModelBase
         ExportCommand.IsExecuting.ToProperty(this, x => x.IsExporting, out isExporting);
         SearchHighlightThemeSourceCommand = ReactiveCommand.CreateFromTask(SearchHighlightThemeSource);
         OpenLogFolderCommand = ReactiveCommand.Create(dataDirectoryService.OpenLogFolder);
+
+        this.WhenAnyValue(x => x.SourcePath)
+            .Select(path => !string.IsNullOrWhiteSpace(path))
+            .ToProperty(this, x => x.HasInput, out hasInput);
+        this.WhenAnyValue(x => x.Result)
+            .Select(result => !string.IsNullOrWhiteSpace(result))
+            .ToProperty(this, x => x.IsStatusVisible, out isStatusVisible);
 
         this.WhenAnyValue(x => x.SourcePath)
             .Subscribe(path =>
