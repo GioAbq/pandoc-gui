@@ -16,20 +16,23 @@ public class FileDialogService : IFileDialogService
         this.window = window;
     }
 
-    public async Task<string> OpenFileAsync(string? filterName = null, IReadOnlyList<string>? extensions = null)
+    public async Task<string> OpenFileAsync(IReadOnlyList<FilePickerGroup>? groups = null)
     {
         var options = new FilePickerOpenOptions { AllowMultiple = false };
 
-        if (filterName is not null && extensions is { Count: > 0 })
+        if (groups is { Count: > 0 })
         {
-            options.FileTypeFilter = new[]
+            var allExtensions = groups.SelectMany(group => group.Extensions).Distinct().ToList();
+
+            var filters = new List<FilePickerFileType>
             {
-                new FilePickerFileType(filterName)
-                {
-                    Patterns = extensions.Select(extension => "*" + extension).ToList()
-                },
-                FilePickerFileTypes.All
+                new("All supported documents") { Patterns = ToPatterns(allExtensions) }
             };
+            filters.AddRange(groups.Select(group =>
+                new FilePickerFileType(group.Name) { Patterns = ToPatterns(group.Extensions) }));
+            filters.Add(FilePickerFileTypes.All);
+
+            options.FileTypeFilter = filters;
         }
 
         try
@@ -56,4 +59,7 @@ public class FileDialogService : IFileDialogService
             return "";
         }
     }
+
+    private static List<string> ToPatterns(IEnumerable<string> extensions) =>
+        extensions.Select(extension => "*" + extension).ToList();
 }

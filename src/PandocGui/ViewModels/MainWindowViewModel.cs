@@ -210,7 +210,15 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private async Task SearchInputFile()
     {
-        SourcePath = await fileDialogService.OpenFileAsync("Documents", PandocFormats.InputExtensions);
+        var groups = PandocFormats.InputFormats
+            .Where(format => format.Extensions.Count > 0)
+            .GroupBy(format => format.Category)
+            .Select(group => new FilePickerGroup(
+                group.Key,
+                group.SelectMany(format => format.Extensions).Distinct().ToList()))
+            .ToList();
+
+        SourcePath = await fileDialogService.OpenFileAsync(groups);
         Console.WriteLine($"Source path : {SourcePath}");
     }
 
