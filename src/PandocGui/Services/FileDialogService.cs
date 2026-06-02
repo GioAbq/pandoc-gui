@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
@@ -14,15 +16,25 @@ public class FileDialogService : IFileDialogService
         this.window = window;
     }
 
-    public async Task<string> OpenFileAsync()
+    public async Task<string> OpenFileAsync(string? filterName = null, IReadOnlyList<string>? extensions = null)
     {
+        var options = new FilePickerOpenOptions { AllowMultiple = false };
+
+        if (filterName is not null && extensions is { Count: > 0 })
+        {
+            options.FileTypeFilter = new[]
+            {
+                new FilePickerFileType(filterName)
+                {
+                    Patterns = extensions.Select(extension => "*" + extension).ToList()
+                },
+                FilePickerFileTypes.All
+            };
+        }
+
         try
         {
-            var files = await window.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-            {
-                AllowMultiple = false
-            });
-
+            var files = await window.StorageProvider.OpenFilePickerAsync(options);
             return files.Count == 0 ? "" : files[0].TryGetLocalPath() ?? "";
         }
         catch (Exception)
@@ -33,9 +45,10 @@ public class FileDialogService : IFileDialogService
 
     public async Task<string> SaveFileAsync()
     {
+        var dialog = new FilePickerSaveOptions();
         try
         {
-            var file = await window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions());
+            var file = await window.StorageProvider.SaveFilePickerAsync(dialog);
             return file?.TryGetLocalPath() ?? "";
         }
         catch (Exception)
