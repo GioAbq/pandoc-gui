@@ -22,6 +22,69 @@ public class PandocCommandGeneratorTest
         Assert.Equal("-f markdown \"test.md\"", command);
     }
 
+    [Theory]
+    [InlineData("docx", "test.docx", "-f docx \"test.docx\"")]
+    [InlineData("html", "page.html", "-f html \"page.html\"")]
+    [InlineData("latex", "doc.tex", "-f latex \"doc.tex\"")]
+    public void CommandGenerator_WithSourceFormat_ReturnsFormatCommand(string format, string source, string expected)
+    {
+        // Given
+        var generator = new PandocCommandGenerator(format);
+
+        // When
+        var command = generator.GetCommand(source);
+
+        // Then
+        Assert.Equal(expected, command);
+    }
+
+    [Fact]
+    public void CommandGenerator_BlankSourceFormat_FallsBackToMarkdown()
+    {
+        // Given
+        var generator = new PandocCommandGenerator("");
+
+        // When
+        var command = generator.GetCommand("test.md");
+
+        // Then
+        Assert.Equal("-f markdown \"test.md\"", command);
+    }
+
+    [Theory]
+    [InlineData("report.md", "markdown")]
+    [InlineData("report.MARKDOWN", "markdown")]
+    [InlineData("paper.docx", "docx")]
+    [InlineData("page.html", "html")]
+    [InlineData("doc.tex", "latex")]
+    [InlineData("notebook.ipynb", "ipynb")]
+    [InlineData("unknown.xyz", "markdown")]
+    [InlineData("", "markdown")]
+    public void DetectInputFormat_MapsExtensionToPandocFormat(string path, string expected)
+    {
+        Assert.Equal(expected, PandocFormats.DetectInputFormat(path));
+    }
+
+    [Fact]
+    public void BuildGenerator_WithSourceFormat_UsesItForReader()
+    {
+        // Given
+        var parameters = new PandocParameters
+        {
+            SourcePath = "paper.docx",
+            TargetPath = "paper.pdf",
+            SourceFormat = "docx",
+            LogToFile = false
+        };
+        var cli = new PandocCli();
+
+        // When
+        var generator = cli.BuildGenerator(parameters);
+
+        // Then
+        Assert.Equal("-f docx \"paper.docx\" -V geometry:a4paper", generator.GetCommand("paper.docx"));
+    }
+
     [Fact]
     public void HighlightGenerator_ReturnsHighlightCommand()
     {
