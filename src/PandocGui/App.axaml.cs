@@ -34,7 +34,8 @@ public class App : Application
                     new FileDialogService(desktop.MainWindow),
                     new PandocCli(),
                     dataDirService,
-                    desktop.MainWindow.Clipboard ?? throw new InvalidOperationException("No application clipboard")
+                    desktop.MainWindow.Clipboard ?? throw new InvalidOperationException("No application clipboard"),
+                    new PandocEnvironmentService()
                 );
         }
 

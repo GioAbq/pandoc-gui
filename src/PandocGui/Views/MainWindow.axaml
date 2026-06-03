@@ -3,6 +3,8 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:ui="using:FluentAvalonia.UI.Controls"
+        xmlns:cli="using:PandocGui.CliWrapper"
+        xmlns:sys="using:System"
         xmlns:avaloniaProgressRing="clr-namespace:AvaloniaProgressRing;assembly=AvaloniaProgressRing"
         mc:Ignorable="d"
         Width="640" Height="600"
@@ -19,6 +21,13 @@
                 <MenuItem x:Name="openLogFolderMenu" Header="Open logs folder" />
             </MenuItem>
         </Menu>
+
+        <ui:FAInfoBar x:Name="pandocBanner" DockPanel.Dock="Top"
+                      IsClosable="False" Margin="24,12,24,0">
+            <ui:FAInfoBar.ActionButton>
+                <Button x:Name="pandocActionButton" />
+            </ui:FAInfoBar.ActionButton>
+        </ui:FAInfoBar>
 
         <Panel Margin="24">
 
@@ -69,7 +78,13 @@
                         <Grid ColumnDefinitions="*,140,Auto">
                             <TextBox x:Name="searchSourceFileInput" Grid.Column="0" Margin="0,0,8,0" />
                             <ComboBox x:Name="inputFormatCombo" Grid.Column="1" Margin="0,0,8,0"
-                                      HorizontalAlignment="Stretch" />
+                                      HorizontalAlignment="Stretch">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="cli:InputFormat">
+                                        <TextBlock Text="{Binding DisplayName}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
                             <Button x:Name="searchSourceFileButton" Grid.Column="2" Content="Browse&#x2026;" />
                         </Grid>
 
@@ -77,7 +92,13 @@
                         <Grid ColumnDefinitions="*,140,Auto">
                             <TextBox x:Name="searchTargetFileInput" Grid.Column="0" Margin="0,0,8,0" />
                             <ComboBox x:Name="outputFormatCombo" Grid.Column="1" Margin="0,0,8,0"
-                                      HorizontalAlignment="Stretch" />
+                                      HorizontalAlignment="Stretch">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="cli:OutputFormat">
+                                        <TextBlock Text="{Binding DisplayName}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
                             <Button x:Name="searchTargetFileButton" Grid.Column="2" Content="Browse&#x2026;" />
                         </Grid>
 
@@ -107,7 +128,13 @@
                                     <TextBlock Text="Custom font" VerticalAlignment="Center" />
                                     <ToggleSwitch x:Name="customFontToggle" Grid.Column="1" />
                                 </Grid>
-                                <ComboBox x:Name="fontNameCombobox" HorizontalAlignment="Stretch" />
+                                <ComboBox x:Name="fontNameCombobox" HorizontalAlignment="Stretch">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="sys:String">
+                                            <TextBlock Text="{Binding}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
 
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBlock Text="Custom margin (cm)" VerticalAlignment="Center" />
@@ -120,7 +147,13 @@
                                     <TextBlock Text="Custom PDF engine" VerticalAlignment="Center" />
                                     <ToggleSwitch x:Name="pdfEngineToggle" Grid.Column="1" />
                                 </Grid>
-                                <ComboBox x:Name="pdfEngineCombobox" HorizontalAlignment="Stretch" />
+                                <ComboBox x:Name="pdfEngineCombobox" HorizontalAlignment="Stretch">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="sys:String">
+                                            <TextBlock Text="{Binding}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
 
                             </StackPanel>
                         </Expander>
