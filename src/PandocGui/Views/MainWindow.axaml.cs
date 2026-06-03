@@ -33,6 +33,8 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     private Button CopyButton => this.FindControl<Button>("copyCommandButton")!;
     private ToggleSwitch OpenOnCompletionToggle => this.FindControl<ToggleSwitch>("openOnCompletionToggle")!;
     private FAInfoBar StatusBar => this.FindControl<FAInfoBar>("statusBar")!;
+    private FAInfoBar PandocBanner => this.FindControl<FAInfoBar>("pandocBanner")!;
+    private Button PandocActionButton => this.FindControl<Button>("pandocActionButton")!;
 
     private ToggleSwitch HighlightEnabledToggle => this.FindControl<ToggleSwitch>("highlightToggle")!;
     private TextBox HighlightFileInput => this.FindControl<TextBox>("highlightFileInput")!;
@@ -98,6 +100,21 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             this.OneWayBind(ViewModel, vm => vm.Result, v => v.StatusBar.Message)
                 .DisposeWith(disposable);
             this.OneWayBind(ViewModel, vm => vm.IsError, v => v.StatusBar.Severity, ErrorToSeverity)
+                .DisposeWith(disposable);
+
+            this.OneWayBind(ViewModel, vm => vm.IsPandocBannerVisible, v => v.PandocBanner.IsOpen)
+                .DisposeWith(disposable);
+            this.OneWayBind(ViewModel, vm => vm.PandocBannerTitle, v => v.PandocBanner.Title)
+                .DisposeWith(disposable);
+            this.OneWayBind(ViewModel, vm => vm.PandocBannerMessage, v => v.PandocBanner.Message)
+                .DisposeWith(disposable);
+            this.OneWayBind(ViewModel, vm => vm.IsPandocBannerError, v => v.PandocBanner.Severity, PandocSeverity)
+                .DisposeWith(disposable);
+            this.OneWayBind(ViewModel, vm => vm.PandocActionLabel, v => v.PandocActionButton.Content)
+                .DisposeWith(disposable);
+            this.OneWayBind(ViewModel, vm => vm.IsPandocActionVisible, v => v.PandocActionButton.IsVisible)
+                .DisposeWith(disposable);
+            this.BindCommand(ViewModel, vm => vm.PandocActionCommand, v => v.PandocActionButton)
                 .DisposeWith(disposable);
 
             this.Bind(ViewModel, vm => vm.CustomHighlightThemeEnabled, v => v.HighlightEnabledToggle.IsChecked)
@@ -170,6 +187,9 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
 
     private FAInfoBarSeverity ErrorToSeverity(bool isError) =>
         isError ? FAInfoBarSeverity.Error : FAInfoBarSeverity.Success;
+
+    private FAInfoBarSeverity PandocSeverity(bool isError) =>
+        isError ? FAInfoBarSeverity.Warning : FAInfoBarSeverity.Informational;
 
     private decimal? MarginToValue(decimal value) => value;
     private decimal ValueToMargin(decimal? value) => value ?? 1.3m;

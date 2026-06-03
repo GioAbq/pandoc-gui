@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
@@ -62,14 +63,18 @@ public class PandocCli : IPandocCli
         process.OutputDataReceived += (s, e) => Log.Information($"Pandoc Info : {e.Data}");
         process.ErrorDataReceived += (s, e) => Log.Error($"Pandoc Error : {e.Data}");
 
-        process.Start();
+        try
+        {
+            process.Start();
+        }
+        catch (Win32Exception)
+        {
+            throw new InvalidOperationException(
+                "Pandoc was not found. Install it from the banner, or from https://pandoc.org/installing.html");
+        }
+
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
-
-        if (process == null)
-        {
-            throw new ArgumentException("Invalid Command or pandoc not found");
-        }
 
         await process.WaitForExitAsync();
         return process.ExitCode;

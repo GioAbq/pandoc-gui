@@ -9,11 +9,13 @@ using System.Reactive.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Avalonia.Input.Platform;
+using Avalonia.Threading;
 using PandocGui.CliWrapper;
 using PandocGui.CliWrapper.Command;
 using PandocGui.Services;
 using ReactiveUI;
 using ReactiveUI.SourceGenerators;
+using Serilog;
 using SkiaSharp;
 
 namespace PandocGui.ViewModels;
@@ -27,6 +29,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> OpenLogFolderCommand { get; }
     public ReactiveCommand<Unit, Unit> ClearCommand { get; }
     public ReactiveCommand<Unit, Unit> CopyCommand { get; }
+    public ReactiveCommand<Unit, Unit> PandocActionCommand { get; }
 
     [Reactive] public partial string SourcePath { get; set; }
 
@@ -50,6 +53,15 @@ public partial class MainWindowViewModel : ViewModelBase
     [Reactive] public partial string Result { get; set; }
     [Reactive] public partial bool IsError { get; set; }
     [Reactive] public partial bool OpenFileOnCompletion { get; set; }
+
+    [Reactive] public partial bool IsPandocAvailable { get; set; }
+    [Reactive] public partial bool IsPandocBannerVisible { get; set; }
+    [Reactive] public partial string PandocBannerTitle { get; set; }
+    [Reactive] public partial string PandocBannerMessage { get; set; }
+    [Reactive] public partial bool IsPandocBannerError { get; set; }
+    [Reactive] public partial bool IsPandocActionVisible { get; set; }
+    [Reactive] public partial string PandocActionLabel { get; set; }
+
     public List<string> SupportedEngine { get; } = PdfEnginePandocCommandGenerator.supportedEngines.ToList();
     public List<string> InstalledFonts { get; }
     public List<InputFormat> SupportedInputFormats { get; } = PandocFormats.InputFormats.ToList();
@@ -60,6 +72,8 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IPandocCli pandoc;
     private readonly IDataDirectoryService dataDirectoryService;
     private readonly IClipboard clipboard;
+    private readonly IPandocEnvironmentService pandocEnvironment;
+    private PandocStatus? lastStatus;
     private readonly ObservableAsPropertyHelper<bool> isExporting;
     public bool IsExporting => isExporting.Value;
     private readonly ObservableAsPropertyHelper<bool> hasInput;
@@ -68,7 +82,8 @@ public partial class MainWindowViewModel : ViewModelBase
     public bool IsStatusVisible => isStatusVisible.Value;
 
     public MainWindowViewModel(IFileDialogService fileDialogService, IPandocCli pandoc,
-        IDataDirectoryService dataDirectoryService, IClipboard clipboard)
+        IDataDirectoryService dataDirectoryService, IClipboard clipboard,
+        IPandocEnvironmentService pandocEnvironment)
     {
         this.clipboard = clipboard;
         dataDirectoryService.EnsureCreated();
@@ -80,11 +95,15 @@ public partial class MainWindowViewModel : ViewModelBase
         CustomPdfEngineValue = "";
         Result = "";
         OpenFileOnCompletion = true;
+        PandocBannerTitle = "";
+        PandocBannerMessage = "";
+        PandocActionLabel = "";
         SelectedInputFormat = SupportedInputFormats[0];
         SelectedOutputFormat = SupportedOutputFormats[0];
         this.fileDialogService = fileDialogService;
         this.pandoc = pandoc;
         this.dataDirectoryService = dataDirectoryService;
+        this.pandocEnvironment = pandocEnvironment;
         ClearCommand = ReactiveCommand.CreateFromTask(Clear);
         SearchSourceFileCommand = ReactiveCommand.CreateFromTask(SearchInputFile);
         SearchTargetFileCommand = ReactiveCommand.CreateFromTask(SearchOutputFile);
@@ -92,12 +111,16 @@ public partial class MainWindowViewModel : ViewModelBase
         var canExport = this.WhenAnyValue(
             x => x.SourcePath,
             x => x.TargetPath,
-            (source, target) => !string.IsNullOrWhiteSpace(source) && !string.IsNullOrWhiteSpace(target));
+            x => x.IsPandocAvailable,
+            (source, target, pandocAvailable) => pandocAvailable
+                && !string.IsNullOrWhiteSpace(source) && !string.IsNullOrWhiteSpace(target));
         ExportCommand = ReactiveCommand.CreateFromTask(Export, canExport);
         CopyCommand = ReactiveCommand.CreateFromTask(CopyPandocToClipBoard);
         ExportCommand.IsExecuting.ToProperty(this, x => x.IsExporting, out isExporting);
         SearchHighlightThemeSourceCommand = ReactiveCommand.CreateFromTask(SearchHighlightThemeSource);
         OpenLogFolderCommand = ReactiveCommand.Create(dataDirectoryService.OpenLogFolder);
+        PandocActionCommand = ReactiveCommand.CreateFromTask(RunPandocActionAsync);
+        PandocActionCommand.ThrownExceptions.Subscribe(ex => Log.Error(ex, "Pandoc action failed"));
 
         this.WhenAnyValue(x => x.SourcePath)
             .Select(path => !string.IsNullOrWhiteSpace(path))
@@ -126,6 +149,115 @@ public partial class MainWindowViewModel : ViewModelBase
         if (args.Count() > 1 && File.Exists(args[1]))
         {
             this.SourcePath = args[1];
+        }
+
+        // Detect pandoc at startup (fire-and-forget; exceptions handled inside).
+        _ = CheckPandocEnvironmentAsync();
+    }
+
+    private async Task CheckPandocEnvironmentAsync()
+    {
+        try
+        {
+            // Apply the local detection result first so Convert unblocks immediately;
+            // the winget update check (network, slower) must not gate the UI.
+            var status = await pandocEnvironment.DetectAsync();
+            Dispatcher.UIThread.Post(() => ApplyStatus(status));
+
+            if (status.Availability == PandocAvailability.Installed && status.CanInstallViaWinget)
+            {
+                var latest = await pandocEnvironment.GetLatestWingetVersionAsync();
+                var withUpdate = status with
+                {
+                    LatestVersion = latest,
+                    UpdateAvailable = PandocEnvironment.IsUpdateAvailable(status.InstalledVersion, latest)
+                };
+                Dispatcher.UIThread.Post(() => ApplyStatus(withUpdate));
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to check the pandoc environment");
+        }
+    }
+
+    private void ApplyStatus(PandocStatus status)
+    {
+        lastStatus = status;
+        IsPandocAvailable = status.Availability == PandocAvailability.Installed;
+
+        if (status.Availability == PandocAvailability.NotInstalled)
+        {
+            IsPandocBannerError = true;
+            PandocBannerTitle = "Pandoc not found";
+            PandocBannerMessage = status.CanInstallViaWinget
+                ? "Pandoc is required to convert documents. Install it to continue."
+                : status.ManualInstructions
+                  ?? PandocEnvironment.GetManualInstallInstructions(PandocEnvironment.GetCurrentOs());
+            PandocActionLabel = status.CanInstallViaWinget ? "Install pandoc" : "Open download page";
+            IsPandocActionVisible = true;
+            IsPandocBannerVisible = true;
+            return;
+        }
+
+        if (status.Availability == PandocAvailability.Installed && status.UpdateAvailable)
+        {
+            IsPandocBannerError = false;
+            PandocBannerTitle = "Update available";
+            PandocBannerMessage = $"Pandoc {status.LatestVersion} is available (you have {status.InstalledVersion}).";
+            PandocActionLabel = "Update";
+            IsPandocActionVisible = status.CanInstallViaWinget;
+            IsPandocBannerVisible = true;
+            return;
+        }
+
+        // Installed and current (or version unknown) - nothing to show.
+        IsPandocBannerVisible = false;
+        IsPandocActionVisible = false;
+    }
+
+    private async Task RunPandocActionAsync()
+    {
+        var status = lastStatus;
+        if (status is null) return;
+
+        if (status.Availability == PandocAvailability.NotInstalled && status.CanInstallViaWinget)
+        {
+            await pandocEnvironment.InstallAsync();
+            await CheckPandocEnvironmentAsync();
+            return;
+        }
+
+        if (status.UpdateAvailable && status.CanInstallViaWinget)
+        {
+            await pandocEnvironment.UpgradeAsync();
+            await CheckPandocEnvironmentAsync();
+            return;
+        }
+
+        OpenUrl(PandocEnvironment.DownloadUrl);
+    }
+
+    private static void OpenUrl(string url)
+    {
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+            }
+            else if (OperatingSystem.IsLinux())
+            {
+                Process.Start(new ProcessStartInfo { FileName = "xdg-open", Arguments = url, UseShellExecute = false });
+            }
+            else if (OperatingSystem.IsMacOS())
+            {
+                Process.Start(new ProcessStartInfo { FileName = "open", Arguments = url, UseShellExecute = false });
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to open URL {Url}", url);
         }
     }
 
