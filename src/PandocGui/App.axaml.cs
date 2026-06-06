@@ -24,11 +24,13 @@ public class App : Application
             desktop.MainWindow = new MainWindow();
             var dataDirService = new DataDirectoryService();
 
-            Log.Logger = new LoggerConfiguration()
+            var loggerConfig = new LoggerConfiguration()
                 .MinimumLevel.Debug()
-                .WriteTo.Console()
-                .WriteTo.File(@$"{dataDirService.GetLogsPath()}/app-logs-{DateTime.Now:yyyy-MM-ddTHH-mm-ss}.log")
-                .CreateLogger();
+                .WriteTo.File(@$"{dataDirService.GetLogsPath()}/app-logs-{DateTime.Now:yyyy-MM-ddTHH-mm-ss}.log");
+#if DEBUG
+            loggerConfig.WriteTo.Console();
+#endif
+            Log.Logger = loggerConfig.CreateLogger();
 
             desktop.MainWindow.DataContext = new MainWindowViewModel(
                     new FileDialogService(desktop.MainWindow),
