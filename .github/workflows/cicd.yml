@@ -37,16 +37,18 @@ jobs:
     if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
     needs: [build-and-test]
     runs-on: ubuntu-latest
+    env:
+      # dotnet-deb ships a net9.0 asset (no net10.0 yet). Install ONLY the .NET 10
+      # SDK and roll the net9 tool forward onto the net10 runtime, so the build it
+      # triggers uses the .NET 10 SDK and can target net10. (Installing the .NET 9
+      # SDK alongside makes the tool pick it and fail with NETSDK1045.)
+      DOTNET_ROLL_FORWARD: LatestMajor
     steps:
       - uses: actions/checkout@v6
       - name: Setup .NET
-        # dotnet-deb ships a net9.0 asset (no net10.0 yet); install both runtimes
-        # so the tool runs natively on net9 while the app publishes against net10.
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: |
-            9.0.x
-            10.0.x
+          dotnet-version: 10.0.x
       - name: Install dotnet-deb
         run: dotnet tool install --global dotnet-deb
       - name: Build .deb package
