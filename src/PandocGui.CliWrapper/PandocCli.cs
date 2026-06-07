@@ -24,7 +24,7 @@ public class PandocCli : IPandocCli
         {
             var error = (PandocErrorCode)result;
             Log.Error($"Pandoc Error : {error}");
-            throw new InvalidOperationException($"{error}");
+            throw new InvalidOperationException(PandocErrorMessages.Describe(error));
         }
     }
 
