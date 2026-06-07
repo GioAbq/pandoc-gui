@@ -74,7 +74,28 @@
                 <ScrollViewer>
                     <StackPanel Spacing="8">
 
-                        <TextBlock Text="From" FontWeight="SemiBold" />
+                        <TextBlock Text="Preset" FontWeight="SemiBold" />
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <ComboBox x:Name="presetCombo" Grid.Column="0" Margin="0,0,8,0"
+                                      HorizontalAlignment="Stretch" PlaceholderText="Select a preset">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="cli:Preset">
+                                        <TextBlock Text="{Binding Name}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <Button x:Name="importPresetButton" Grid.Column="1" Content="Import&#x2026;"
+                                    Margin="0,0,8,0" />
+                            <Button x:Name="exportPresetButton" Grid.Column="2" Content="Export&#x2026;" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBox x:Name="presetNameInput" Grid.Column="0" Margin="0,0,8,0"
+                                     PlaceholderText="New preset name" />
+                            <Button x:Name="savePresetButton" Grid.Column="1" Content="Save" Margin="0,0,8,0" />
+                            <Button x:Name="deletePresetButton" Grid.Column="2" Content="Delete" />
+                        </Grid>
+
+                        <TextBlock Text="From" FontWeight="SemiBold" Margin="0,8,0,0" />
                         <Grid ColumnDefinitions="*,140,Auto">
                             <TextBox x:Name="searchSourceFileInput" Grid.Column="0" Margin="0,0,8,0" />
                             <ComboBox x:Name="inputFormatCombo" Grid.Column="1" Margin="0,0,8,0"

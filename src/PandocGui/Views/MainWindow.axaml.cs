@@ -49,6 +49,13 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     private ComboBox PdfEngineCombobox => this.FindControl<ComboBox>("pdfEngineCombobox")!;
     private MenuItem OpenLogFolderMenu => this.FindControl<MenuItem>("openLogFolderMenu")!;
 
+    private ComboBox PresetCombo => this.FindControl<ComboBox>("presetCombo")!;
+    private Button ImportPresetButton => this.FindControl<Button>("importPresetButton")!;
+    private Button ExportPresetButton => this.FindControl<Button>("exportPresetButton")!;
+    private TextBox PresetNameInput => this.FindControl<TextBox>("presetNameInput")!;
+    private Button SavePresetButton => this.FindControl<Button>("savePresetButton")!;
+    private Button DeletePresetButton => this.FindControl<Button>("deletePresetButton")!;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -160,6 +167,21 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
                 .DisposeWith(disposable);
 
             this.BindCommand(ViewModel, vm => vm.OpenLogFolderCommand, v => v.OpenLogFolderMenu)
+                .DisposeWith(disposable);
+
+            this.OneWayBind(ViewModel, vm => vm.Presets, v => v.PresetCombo.ItemsSource)
+                .DisposeWith(disposable);
+            this.Bind(ViewModel, vm => vm.SelectedPreset, v => v.PresetCombo.SelectedItem)
+                .DisposeWith(disposable);
+            this.Bind(ViewModel, vm => vm.NewPresetName, v => v.PresetNameInput.Text)
+                .DisposeWith(disposable);
+            this.BindCommand(ViewModel, vm => vm.SavePresetCommand, v => v.SavePresetButton)
+                .DisposeWith(disposable);
+            this.BindCommand(ViewModel, vm => vm.DeletePresetCommand, v => v.DeletePresetButton)
+                .DisposeWith(disposable);
+            this.BindCommand(ViewModel, vm => vm.ImportPresetCommand, v => v.ImportPresetButton)
+                .DisposeWith(disposable);
+            this.BindCommand(ViewModel, vm => vm.ExportPresetCommand, v => v.ExportPresetButton)
                 .DisposeWith(disposable);
         });
     }
