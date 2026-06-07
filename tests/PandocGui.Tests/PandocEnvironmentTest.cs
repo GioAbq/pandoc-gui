@@ -1,11 +1,12 @@
 #nullable enable
 using System;
 using PandocGui.CliWrapper;
+using Shouldly;
 using Xunit;
 
 namespace PandocGui.Tests;
 
-public class PandocEnvironmentTest
+public sealed class PandocEnvironmentTest
 {
     [Theory]
     [InlineData("pandoc 3.9.0.2", "3.9.0.2")]
@@ -14,7 +15,7 @@ public class PandocEnvironmentTest
     [InlineData("pandoc 3.9.0.2\nFeatures: +server +lua\nScripting engine: Lua 5.4", "3.9.0.2")]
     public void ParseVersion_ParsesPandocVersionOutput(string output, string expected)
     {
-        Assert.Equal(Version.Parse(expected), PandocEnvironment.ParseVersion(output));
+        PandocEnvironment.ParseVersion(output).ShouldBe(Version.Parse(expected));
     }
 
     [Theory]
@@ -23,7 +24,7 @@ public class PandocEnvironmentTest
     [InlineData(null)]
     public void ParseVersion_ReturnsNull_WhenNoMatch(string? output)
     {
-        Assert.Null(PandocEnvironment.ParseVersion(output));
+        PandocEnvironment.ParseVersion(output).ShouldBeNull();
     }
 
     [Theory]
@@ -31,7 +32,7 @@ public class PandocEnvironmentTest
     [InlineData("Znaleziono Pandoc\nWersja: 3.9.0.2\nWydawca: John MacFarlane", "3.9.0.2")]
     public void ParseWingetShowVersion_ParsesLocalizedVersionLine(string output, string expected)
     {
-        Assert.Equal(Version.Parse(expected), PandocEnvironment.ParseWingetShowVersion(output));
+        PandocEnvironment.ParseWingetShowVersion(output).ShouldBe(Version.Parse(expected));
     }
 
     [Theory]
@@ -40,7 +41,7 @@ public class PandocEnvironmentTest
     [InlineData(null)]
     public void ParseWingetShowVersion_ReturnsNull_WhenNoMatch(string? output)
     {
-        Assert.Null(PandocEnvironment.ParseWingetShowVersion(output));
+        PandocEnvironment.ParseWingetShowVersion(output).ShouldBeNull();
     }
 
     [Theory]
@@ -49,15 +50,15 @@ public class PandocEnvironmentTest
     [InlineData("3.9.0", "3.1.0", false)]
     public void IsUpdateAvailable_ComparesVersions(string current, string latest, bool expected)
     {
-        Assert.Equal(expected, PandocEnvironment.IsUpdateAvailable(Version.Parse(current), Version.Parse(latest)));
+        PandocEnvironment.IsUpdateAvailable(Version.Parse(current), Version.Parse(latest)).ShouldBe(expected);
     }
 
     [Fact]
     public void IsUpdateAvailable_ReturnsFalse_WhenEitherVersionIsNull()
     {
-        Assert.False(PandocEnvironment.IsUpdateAvailable(Version.Parse("3.9.0"), null));
-        Assert.False(PandocEnvironment.IsUpdateAvailable(null, Version.Parse("3.9.0")));
-        Assert.False(PandocEnvironment.IsUpdateAvailable(null, null));
+        PandocEnvironment.IsUpdateAvailable(Version.Parse("3.9.0"), null).ShouldBeFalse();
+        PandocEnvironment.IsUpdateAvailable(null, Version.Parse("3.9.0")).ShouldBeFalse();
+        PandocEnvironment.IsUpdateAvailable(null, null).ShouldBeFalse();
     }
 
     [Theory]
@@ -67,6 +68,6 @@ public class PandocEnvironmentTest
     [InlineData(OsKind.Other, "pandoc.org")]
     public void GetManualInstallInstructions_MentionsExpectedHint(OsKind os, string expectedHint)
     {
-        Assert.Contains(expectedHint, PandocEnvironment.GetManualInstallInstructions(os));
+        PandocEnvironment.GetManualInstallInstructions(os).ShouldContain(expectedHint);
     }
 }
