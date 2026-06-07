@@ -2,86 +2,123 @@ name: CI/CD
 
 on:
   push:
-    branches: [ develop, master ]
-    tags:
-      - '*'
+    branches: ['**']
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
-    name: Buid and test application
+    name: Build and test
     runs-on: ubuntu-latest
-    container:
-      image: mcr.microsoft.com/dotnet/sdk:6.0
     steps:
-      - uses: actions/checkout@v2
-      - name: Restore dependencies
-        run: dotnet restore
-      - name: Build
-        run: dotnet build --no-restore
-      - name: Test
-        run: dotnet test --no-build --verbosity normal
-  build-linux-deb:
-    name: Build, Test and compile executable on Linux
-    if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    container:
-      image: mcr.microsoft.com/dotnet/sdk:6.0
-    needs: [build-and-test]
-    steps:
-    - uses: actions/checkout@v2
-    - name: Install dotnet deb
-      run: |
-        cd src/PandocGui 
-        dotnet tool install --global dotnet-deb
-        export PATH="$PATH:/github/home/.dotnet/tools"
-        dotnet deb install
-    - name: Build deb package
-      run: |
-        cd src/PandocGui
-        export PATH="$PATH:/github/home/.dotnet/tools"
-        dotnet deb -c Release -f net6.0 -o dist/linux-x64
-    - name: Save deb package as artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: pandoc-gui-deb
-        path: src/PandocGui/dist/linux-x64/
-
-  build-windows-installer:
-    name: Build, Test and publish executable on windows
-    if: startsWith(github.ref, 'refs/tags/')
-    runs-on: windows-latest
-    needs: [build-and-test]
-    steps:
-      - uses: actions/checkout@v2
-      - name: Build Executable
-        run: cd src/PandocGui && dotnet publish --runtime win-x64 --configuration Release -p:PublishSingleFile=true --self-contained true --output C:\temp\pandocgui
-      - name: Compile Installer
-        run: iscc installers/windows/installer.iss /dBuildNumber=${{github.run_number}} /dMyAppURL=https://github.com/${{github.repository}}
-      - name: Save Installer as Artifact
-        uses: actions/upload-artifact@v2
+      - uses: actions/checkout@v6
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
         with:
-          name: pandoc-gui-setup
-          path: C:\temp\pandocgui\pandoc-gui-setup.exe
-  
-  create-release:
-    name: Create a release for with artifacts
-    needs: [build-and-test,build-linux-deb,build-windows-installer]
-    runs-on: ubuntu-latest
+          dotnet-version: 10.0.x
+      - name: Restore
+        run: dotnet restore PandocGui.sln
+      - name: Build
+        run: dotnet build PandocGui.sln -c Release --no-restore
+      - name: Test
+        run: dotnet test PandocGui.sln -c Release --no-build
+
+  package-linux-deb:
+    name: Package Linux (.deb)
     if: startsWith(github.ref, 'refs/tags/')
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/checkout@v6
+      - name: Setup .NET
+        # dotnet-deb ships a net9.0 asset (no net10.0 yet); install both runtimes
+        # so the tool runs natively on net9 while the app publishes against net10.
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+      - name: Install dotnet-deb
+        run: dotnet tool install --global dotnet-deb
+      - name: Build .deb package
+        run: |
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          cd src/PandocGui
+          dotnet deb install
+          dotnet deb -c Release -f net10.0 -o dist/linux-x64
+      - name: Upload .deb artifact
+        uses: actions/upload-artifact@v7
         with:
           name: pandoc-gui-deb
-          path: linux
-      - uses: actions/download-artifact@v3
+          path: src/PandocGui/dist/linux-x64/*.deb
+          if-no-files-found: error
+
+  package-windows:
+    name: Package Windows (installer)
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [build-and-test]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+      - name: Build installer
+        shell: pwsh
+        run: ./installers/windows/build-inno.ps1
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v7
         with:
           name: pandoc-gui-setup
-          path: windows
-      - name: Build
-        run: echo ${{ github.sha }} > Release.txt
-      - name: Release
-        uses: softprops/action-gh-release@v1
+          path: dist/releases/win-x64/pandoc-gui-setup.exe
+          if-no-files-found: error
+
+  package-macos:
+    name: Package macOS
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [build-and-test]
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Publish self-contained and zip (osx-arm64, osx-x64)
+        run: |
+          for rid in osx-arm64 osx-x64; do
+            dotnet publish src/PandocGui/PandocGui.csproj -c Release -r "$rid" --self-contained -o "dist/$rid"
+            ditto -c -k --keepParent "dist/$rid" "pandoc-gui-$rid.zip"
+          done
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: pandoc-gui-macos
+          path: pandoc-gui-*.zip
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: [package-linux-deb, package-windows, package-macos]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+      - name: Publish release
+        uses: softprops/action-gh-release@v3
         with:
           files: |
-            Release.txt
-            linux/PandocGui.1.0.0.deb
-            windows/pandoc-gui-setup.exe
+            artifacts/pandoc-gui-deb/*.deb
+            artifacts/pandoc-gui-setup/*.exe
+            artifacts/pandoc-gui-macos/*.zip
