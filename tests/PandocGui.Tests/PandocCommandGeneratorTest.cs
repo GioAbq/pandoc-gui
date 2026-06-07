@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using NSubstitute;
 using PandocGui.CliWrapper;
 using PandocGui.CliWrapper.Command;
 using Shouldly;
@@ -59,6 +60,7 @@ public sealed class PandocCommandGeneratorTest
     [InlineData("page.html", "html")]
     [InlineData("doc.tex", "latex")]
     [InlineData("notebook.ipynb", "ipynb")]
+    [InlineData("legacy.doc", "docx")]
     [InlineData("unknown.xyz", "markdown")]
     [InlineData("", "markdown")]
     public void DetectInputFormat_MapsExtensionToPandocFormat(string path, string expected)
@@ -69,6 +71,7 @@ public sealed class PandocCommandGeneratorTest
     [Theory]
     [InlineData("report.md", true)]
     [InlineData("paper.docx", true)]
+    [InlineData("memo.doc", true)]
     [InlineData("page.HTML", true)]
     [InlineData("photo.jpg", false)]
     [InlineData("tool.exe", false)]
@@ -97,7 +100,7 @@ public sealed class PandocCommandGeneratorTest
             SourceFormat = "docx",
             LogToFile = false
         };
-        var cli = new PandocCli();
+        var cli = new PandocCli(Substitute.For<IDocPreprocessor>());
 
         // When
         var generator = cli.BuildGenerator(parameters);
@@ -254,7 +257,7 @@ public sealed class PandocCommandGeneratorTest
             LogFilePath = "logs.txt"
         };
 
-        var cli = new PandocCli();
+        var cli = new PandocCli(Substitute.For<IDocPreprocessor>());
 
         // When
         var generator = cli.BuildGenerator(parameters);
