@@ -1,13 +1,14 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Threading.Tasks;
 using PandocGui.CliWrapper;
 using PandocGui.CliWrapper.Command;
+using Shouldly;
 using Xunit;
 
 namespace PandocGui.Tests;
 
-public class PandocCommandGeneratorTest
+public sealed class PandocCommandGeneratorTest
 {
     [Fact]
     public void CommandGenerator_ReturnsBaseCommand()
@@ -19,7 +20,7 @@ public class PandocCommandGeneratorTest
         var command = generator.GetCommand("test.md");
 
         // Then
-        Assert.Equal("-f markdown \"test.md\"", command);
+        command.ShouldBe("-f markdown \"test.md\"");
     }
 
     [Theory]
@@ -35,7 +36,7 @@ public class PandocCommandGeneratorTest
         var command = generator.GetCommand(source);
 
         // Then
-        Assert.Equal(expected, command);
+        command.ShouldBe(expected);
     }
 
     [Fact]
@@ -48,7 +49,7 @@ public class PandocCommandGeneratorTest
         var command = generator.GetCommand("test.md");
 
         // Then
-        Assert.Equal("-f markdown \"test.md\"", command);
+        command.ShouldBe("-f markdown \"test.md\"");
     }
 
     [Theory]
@@ -62,7 +63,7 @@ public class PandocCommandGeneratorTest
     [InlineData("", "markdown")]
     public void DetectInputFormat_MapsExtensionToPandocFormat(string path, string expected)
     {
-        Assert.Equal(expected, PandocFormats.DetectInputFormat(path));
+        PandocFormats.DetectInputFormat(path).ShouldBe(expected);
     }
 
     [Theory]
@@ -75,14 +76,14 @@ public class PandocCommandGeneratorTest
     [InlineData("", false)]
     public void IsSupportedInput_AcceptsOnlyKnownDocumentExtensions(string path, bool expected)
     {
-        Assert.Equal(expected, PandocFormats.IsSupportedInput(path));
+        PandocFormats.IsSupportedInput(path).ShouldBe(expected);
     }
 
     [Fact]
     public void InputFormats_StartWithMostPopular()
     {
-        Assert.Equal("Markdown", PandocFormats.InputFormats[0].DisplayName);
-        Assert.Equal("PDF", PandocFormats.OutputFormats[0].DisplayName);
+        PandocFormats.InputFormats[0].DisplayName.ShouldBe("Markdown");
+        PandocFormats.OutputFormats[0].DisplayName.ShouldBe("PDF");
     }
 
     [Fact]
@@ -102,7 +103,7 @@ public class PandocCommandGeneratorTest
         var generator = cli.BuildGenerator(parameters);
 
         // Then
-        Assert.Equal("-f docx \"paper.docx\" -V geometry:a4paper", generator.GetCommand("paper.docx"));
+        generator.GetCommand("paper.docx").ShouldBe("-f docx \"paper.docx\" -V geometry:a4paper");
     }
 
     [Fact]
@@ -115,7 +116,7 @@ public class PandocCommandGeneratorTest
         var command = generator.GetCommand("test.md");
 
         // Then
-        Assert.Equal("-f markdown \"test.md\" --highlight-style \"style.theme\"", command);
+        command.ShouldBe("-f markdown \"test.md\" --highlight-style \"style.theme\"");
     }
 
 
@@ -129,7 +130,7 @@ public class PandocCommandGeneratorTest
         var command = generator.GetCommand("test.md");
 
         // Then
-        Assert.Equal("-f markdown \"test.md\" -N", command);
+        command.ShouldBe("-f markdown \"test.md\" -N");
     }
 
     [Fact]
@@ -143,7 +144,7 @@ public class PandocCommandGeneratorTest
         var command = generator.GetCommand("test.md");
 
         // Then
-        Assert.Equal("-f markdown \"test.md\" -V testkey:testvalue", command);
+        command.ShouldBe("-f markdown \"test.md\" -V testkey:testvalue");
     }
 
     [Fact]
@@ -156,7 +157,7 @@ public class PandocCommandGeneratorTest
         var command = generator.GetCommand("test.md");
 
         // Then
-        Assert.Equal("-f markdown \"test.md\" -V mainfont:\"Segoe UI\"", command);
+        command.ShouldBe("-f markdown \"test.md\" -V mainfont:\"Segoe UI\"");
     }
 
     [Fact]
@@ -169,7 +170,7 @@ public class PandocCommandGeneratorTest
         var command = generator.GetCommand("test.md");
 
         // Then
-        Assert.Equal("-f markdown \"test.md\" -V geometry:a4paper", command);
+        command.ShouldBe("-f markdown \"test.md\" -V geometry:a4paper");
     }
 
     [Fact]
@@ -182,7 +183,7 @@ public class PandocCommandGeneratorTest
         var command = generator.GetCommand("test.md");
 
         // Then
-        Assert.Equal("-f markdown \"test.md\" -V geometry:margin=1.3cm", command);
+        command.ShouldBe("-f markdown \"test.md\" -V geometry:margin=1.3cm");
     }
 
     [Fact]
@@ -195,7 +196,7 @@ public class PandocCommandGeneratorTest
         var command = generator.GetCommand("test.md");
 
         // Then
-        Assert.Equal("-f markdown \"test.md\" --toc", command);
+        command.ShouldBe("-f markdown \"test.md\" --toc");
     }
 
     [Fact]
@@ -208,7 +209,7 @@ public class PandocCommandGeneratorTest
         var command = generator.GetCommand("test.md");
 
         // Then
-        Assert.Equal("-f markdown \"test.md\" --pdf-engine=xelatex", command);
+        command.ShouldBe("-f markdown \"test.md\" --pdf-engine=xelatex");
     }
 
     [Fact]
@@ -221,13 +222,13 @@ public class PandocCommandGeneratorTest
         var command = generator.GetCommand("test.md");
 
         // Then
-        Assert.Equal("-f markdown \"test.md\" --log=\"logs.txt\"", command);
+        command.ShouldBe("-f markdown \"test.md\" --log=\"logs.txt\"");
     }
 
     [Fact]
     public void EngineGenerator_NonExistingEngine_Throws()
     {
-        Assert.Throws<ArgumentException>(() =>
+        Should.Throw<ArgumentException>(() =>
             new PdfEnginePandocCommandGenerator(new PandocCommandGenerator(), "not a valid engine"));
     }
 
@@ -259,8 +260,7 @@ public class PandocCommandGeneratorTest
         var generator = cli.BuildGenerator(parameters);
 
         // Then
-        Assert.Equal(
-            "-f markdown \"test.md\" --highlight-style \"style.theme\" -N -V mainfont:\"Segoe UI\" -V geometry:a4paper -V geometry:margin=1.3cm --pdf-engine=xelatex --toc --log=\"logs.txt\"",
-            generator.GetCommand("test.md"));
+        generator.GetCommand("test.md").ShouldBe(
+            "-f markdown \"test.md\" --highlight-style \"style.theme\" -N -V mainfont:\"Segoe UI\" -V geometry:a4paper -V geometry:margin=1.3cm --pdf-engine=xelatex --toc --log=\"logs.txt\"");
     }
 }
