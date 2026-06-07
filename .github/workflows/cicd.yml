@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+env:
+  # The ReactiveUI/Splat packages are signed with a certificate that now reports
+  # as revoked, which makes `dotnet restore` fail on Linux runners (NU3012). The
+  # packages are otherwise valid, so skip NuGet signature verification.
+  DOTNET_NUGET_SIGNATURE_VERIFICATION: "false"
+
 jobs:
   build-and-test:
     name: Build and test
