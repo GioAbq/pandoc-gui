@@ -56,6 +56,15 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
     private Button SavePresetButton => this.FindControl<Button>("savePresetButton")!;
     private Button DeletePresetButton => this.FindControl<Button>("deletePresetButton")!;
 
+    private Button AddBatchFilesButton => this.FindControl<Button>("addBatchFilesButton")!;
+    private Button AddBatchFolderButton => this.FindControl<Button>("addBatchFolderButton")!;
+    private Button RemoveBatchItemButton => this.FindControl<Button>("removeBatchItemButton")!;
+    private Button ClearBatchButton => this.FindControl<Button>("clearBatchButton")!;
+    private Button ConvertBatchButton => this.FindControl<Button>("convertBatchButton")!;
+    private ComboBox BatchOutputFormatCombo => this.FindControl<ComboBox>("batchOutputFormatCombo")!;
+    private TextBlock BatchSummaryText => this.FindControl<TextBlock>("batchSummaryText")!;
+    private ListBox BatchList => this.FindControl<ListBox>("batchList")!;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -182,6 +191,27 @@ public partial class MainWindow : ReactiveWindow<MainWindowViewModel>
             this.BindCommand(ViewModel, vm => vm.ImportPresetCommand, v => v.ImportPresetButton)
                 .DisposeWith(disposable);
             this.BindCommand(ViewModel, vm => vm.ExportPresetCommand, v => v.ExportPresetButton)
+                .DisposeWith(disposable);
+
+            this.OneWayBind(ViewModel, vm => vm.BatchItems, v => v.BatchList.ItemsSource)
+                .DisposeWith(disposable);
+            this.Bind(ViewModel, vm => vm.SelectedBatchItem, v => v.BatchList.SelectedItem)
+                .DisposeWith(disposable);
+            this.OneWayBind(ViewModel, vm => vm.SupportedOutputFormats, v => v.BatchOutputFormatCombo.ItemsSource)
+                .DisposeWith(disposable);
+            this.Bind(ViewModel, vm => vm.SelectedOutputFormat, v => v.BatchOutputFormatCombo.SelectedItem)
+                .DisposeWith(disposable);
+            this.OneWayBind(ViewModel, vm => vm.BatchSummary, v => v.BatchSummaryText.Text)
+                .DisposeWith(disposable);
+            this.BindCommand(ViewModel, vm => vm.AddBatchFilesCommand, v => v.AddBatchFilesButton)
+                .DisposeWith(disposable);
+            this.BindCommand(ViewModel, vm => vm.AddBatchFolderCommand, v => v.AddBatchFolderButton)
+                .DisposeWith(disposable);
+            this.BindCommand(ViewModel, vm => vm.RemoveBatchItemCommand, v => v.RemoveBatchItemButton)
+                .DisposeWith(disposable);
+            this.BindCommand(ViewModel, vm => vm.ClearBatchCommand, v => v.ClearBatchButton)
+                .DisposeWith(disposable);
+            this.BindCommand(ViewModel, vm => vm.ConvertBatchCommand, v => v.ConvertBatchButton)
                 .DisposeWith(disposable);
         });
     }
