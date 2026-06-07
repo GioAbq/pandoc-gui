@@ -33,7 +33,7 @@ public static class PandocFormats
         new("Markdown (strict)", "markdown_strict", "Markdown", Array.Empty<string>()),
         new("Markua", "markua", "Markdown", Array.Empty<string>()),
 
-        new("Word (docx)", "docx", "Word processing", new[] { ".docx" }),
+        new("Word (doc, docx)", "docx", "Word processing", new[] { ".docx", ".doc" }),
         new("OpenDocument (odt)", "odt", "Word processing", new[] { ".odt" }),
         new("Rich Text (rtf)", "rtf", "Word processing", new[] { ".rtf" }),
 

@@ -34,7 +34,7 @@ public class App : Application
 
             desktop.MainWindow.DataContext = new MainWindowViewModel(
                     new FileDialogService(desktop.MainWindow),
-                    new PandocCli(),
+                    new PandocCli(new DocPreprocessorService()),
                     dataDirService,
                     desktop.MainWindow.Clipboard ?? throw new InvalidOperationException("No application clipboard"),
                     new PandocEnvironmentService()
