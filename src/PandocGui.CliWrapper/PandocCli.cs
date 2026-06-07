@@ -10,23 +10,57 @@ namespace PandocGui.CliWrapper;
 
 public class PandocCli : IPandocCli
 {
+    private readonly IDocPreprocessor docPreprocessor;
+
+    public PandocCli(IDocPreprocessor docPreprocessor)
+    {
+        this.docPreprocessor = docPreprocessor;
+    }
 
     public async Task ExportPdfAsync(PandocParameters parameters)
     {
-        var generator = BuildGenerator(parameters);
-
-        int result = await ExecuteAsync(
-            parameters.SourcePath,
-            GetExecutionCommand(generator, parameters.SourcePath, parameters.TargetPath)
-        );
-        Log.Information($"Pandoc CLI return code : {result}");
-        if (result != 0)
+        string tempDocx = null;
+        try
         {
-            var error = (PandocErrorCode)result;
-            Log.Error($"Pandoc Error : {error}");
-            throw new InvalidOperationException(PandocErrorMessages.Describe(error));
+            if (IsLegacyDoc(parameters.SourcePath))
+            {
+                tempDocx = await docPreprocessor.ConvertToDocxAsync(parameters.SourcePath);
+                parameters.SourcePath = tempDocx;
+                parameters.SourceFormat = "docx";
+            }
+
+            var generator = BuildGenerator(parameters);
+
+            int result = await ExecuteAsync(
+                parameters.SourcePath,
+                GetExecutionCommand(generator, parameters.SourcePath, parameters.TargetPath)
+            );
+            Log.Information($"Pandoc CLI return code : {result}");
+            if (result != 0)
+            {
+                var error = (PandocErrorCode)result;
+                Log.Error($"Pandoc Error : {error}");
+                throw new InvalidOperationException(PandocErrorMessages.Describe(error));
+            }
+        }
+        finally
+        {
+            if (tempDocx != null && File.Exists(tempDocx))
+            {
+                try
+                {
+                    File.Delete(tempDocx);
+                }
+                catch
+                {
+                    // best effort - temp file cleanup
+                }
+            }
         }
     }
+
+    private static bool IsLegacyDoc(string path) =>
+        string.Equals(Path.GetExtension(path), ".doc", StringComparison.OrdinalIgnoreCase);
 
     public string GetCommand(PandocParameters parameters)
     {
