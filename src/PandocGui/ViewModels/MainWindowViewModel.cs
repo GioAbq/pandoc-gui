@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Drawing.Text;
 using System.IO;
@@ -30,6 +31,10 @@ public partial class MainWindowViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> ClearCommand { get; }
     public ReactiveCommand<Unit, Unit> CopyCommand { get; }
     public ReactiveCommand<Unit, Unit> PandocActionCommand { get; }
+    public ReactiveCommand<Unit, Unit> SavePresetCommand { get; }
+    public ReactiveCommand<Unit, Unit> DeletePresetCommand { get; }
+    public ReactiveCommand<Unit, Unit> ImportPresetCommand { get; }
+    public ReactiveCommand<Unit, Unit> ExportPresetCommand { get; }
 
     [Reactive] public partial string SourcePath { get; set; }
 
@@ -62,6 +67,10 @@ public partial class MainWindowViewModel : ViewModelBase
     [Reactive] public partial bool IsPandocActionVisible { get; set; }
     [Reactive] public partial string PandocActionLabel { get; set; }
 
+    [Reactive] public partial Preset? SelectedPreset { get; set; }
+    [Reactive] public partial string NewPresetName { get; set; }
+    public ObservableCollection<Preset> Presets { get; } = new();
+
     public List<string> SupportedEngine { get; } = PdfEnginePandocCommandGenerator.supportedEngines.ToList();
     public List<string> InstalledFonts { get; }
     public List<InputFormat> SupportedInputFormats { get; } = PandocFormats.InputFormats.ToList();
@@ -73,6 +82,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IDataDirectoryService dataDirectoryService;
     private readonly IClipboard clipboard;
     private readonly IPandocEnvironmentService pandocEnvironment;
+    private readonly IPresetService presetService;
     private PandocStatus? lastStatus;
     private readonly ObservableAsPropertyHelper<bool> isExporting;
     public bool IsExporting => isExporting.Value;
@@ -83,7 +93,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public MainWindowViewModel(IFileDialogService fileDialogService, IPandocCli pandoc,
         IDataDirectoryService dataDirectoryService, IClipboard clipboard,
-        IPandocEnvironmentService pandocEnvironment)
+        IPandocEnvironmentService pandocEnvironment, IPresetService presetService)
     {
         this.clipboard = clipboard;
         dataDirectoryService.EnsureCreated();
@@ -98,12 +108,14 @@ public partial class MainWindowViewModel : ViewModelBase
         PandocBannerTitle = "";
         PandocBannerMessage = "";
         PandocActionLabel = "";
+        NewPresetName = "";
         SelectedInputFormat = SupportedInputFormats[0];
         SelectedOutputFormat = SupportedOutputFormats[0];
         this.fileDialogService = fileDialogService;
         this.pandoc = pandoc;
         this.dataDirectoryService = dataDirectoryService;
         this.pandocEnvironment = pandocEnvironment;
+        this.presetService = presetService;
         ClearCommand = ReactiveCommand.CreateFromTask(Clear);
         SearchSourceFileCommand = ReactiveCommand.CreateFromTask(SearchInputFile);
         SearchTargetFileCommand = ReactiveCommand.CreateFromTask(SearchOutputFile);
@@ -121,6 +133,32 @@ public partial class MainWindowViewModel : ViewModelBase
         OpenLogFolderCommand = ReactiveCommand.Create(dataDirectoryService.OpenLogFolder);
         PandocActionCommand = ReactiveCommand.CreateFromTask(RunPandocActionAsync);
         PandocActionCommand.ThrownExceptions.Subscribe(ex => Log.Error(ex, "Pandoc action failed"));
+
+        var canSavePreset = this.WhenAnyValue(x => x.NewPresetName)
+            .Select(name => !string.IsNullOrWhiteSpace(name));
+        var hasSelectedPreset = this.WhenAnyValue(x => x.SelectedPreset)
+            .Select(preset => preset is not null);
+        SavePresetCommand = ReactiveCommand.CreateFromTask(SavePreset, canSavePreset);
+        DeletePresetCommand = ReactiveCommand.CreateFromTask(DeletePreset, hasSelectedPreset);
+        ImportPresetCommand = ReactiveCommand.CreateFromTask(ImportPreset);
+        ExportPresetCommand = ReactiveCommand.CreateFromTask(ExportPreset, hasSelectedPreset);
+        Observable.Merge(
+                SavePresetCommand.ThrownExceptions,
+                DeletePresetCommand.ThrownExceptions,
+                ImportPresetCommand.ThrownExceptions,
+                ExportPresetCommand.ThrownExceptions)
+            .Subscribe(ex =>
+            {
+                Log.Error(ex, "Preset operation failed");
+                IsError = true;
+                Result = ex.Message;
+            });
+
+        this.WhenAnyValue(x => x.SelectedPreset)
+            .WhereNotNull()
+            .Subscribe(ApplyPreset);
+
+        ReloadPresets();
 
         this.WhenAnyValue(x => x.SourcePath)
             .Select(path => !string.IsNullOrWhiteSpace(path))
@@ -387,5 +425,89 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         clipboard.SetTextAsync($"pandoc {pandoc.GetCommand(BuildPandocParameters())}");
         return Task.CompletedTask;
+    }
+
+    private void ReloadPresets()
+    {
+        Presets.Clear();
+        foreach (var preset in presetService.LoadAll())
+        {
+            Presets.Add(preset);
+        }
+    }
+
+    private void ApplyPreset(Preset preset)
+    {
+        SelectedOutputFormat = SupportedOutputFormats.FirstOrDefault(format => format.Extension == preset.OutputExtension)
+                               ?? SupportedOutputFormats[0];
+        CustomHighlightThemeEnabled = preset.HighlightTheme;
+        CustomHighlightThemeSource = preset.HighlightThemeSource;
+        NumberedHeadersEnabled = preset.NumberedHeader;
+        CustomFontEnabled = preset.CustomFont;
+        CustomFontName = preset.CustomFontName;
+        CustomMarginEnabled = preset.CustomMargin;
+        CustomMarginValue = preset.CustomMarginValue;
+        CustomPdfEngineEnabled = preset.CustomPdfEngine;
+        CustomPdfEngineValue = preset.CustomPdfEngineValue;
+        TableOfContentEnabled = preset.TableOfContents;
+    }
+
+    private Preset BuildPreset(string name) => new()
+    {
+        Name = name,
+        OutputExtension = SelectedOutputFormat.Extension,
+        HighlightTheme = CustomHighlightThemeEnabled,
+        HighlightThemeSource = CustomHighlightThemeSource,
+        NumberedHeader = NumberedHeadersEnabled,
+        CustomFont = CustomFontEnabled,
+        CustomFontName = CustomFontName,
+        CustomMargin = CustomMarginEnabled,
+        CustomMarginValue = CustomMarginValue,
+        CustomPdfEngine = CustomPdfEngineEnabled,
+        CustomPdfEngineValue = CustomPdfEngineValue,
+        TableOfContents = TableOfContentEnabled
+    };
+
+    private Task SavePreset()
+    {
+        var name = (NewPresetName ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(name)) return Task.CompletedTask;
+
+        presetService.Save(BuildPreset(name));
+        ReloadPresets();
+        SelectedPreset = Presets.FirstOrDefault(preset => preset.Name == name);
+        NewPresetName = "";
+        return Task.CompletedTask;
+    }
+
+    private Task DeletePreset()
+    {
+        if (SelectedPreset is null) return Task.CompletedTask;
+
+        presetService.Delete(SelectedPreset.Name);
+        SelectedPreset = null;
+        ReloadPresets();
+        return Task.CompletedTask;
+    }
+
+    private async Task ImportPreset()
+    {
+        var path = await fileDialogService.OpenFileAsync();
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        var preset = presetService.Import(path);
+        presetService.Save(preset);
+        ReloadPresets();
+        SelectedPreset = Presets.FirstOrDefault(existing => existing.Name == preset.Name);
+    }
+
+    private async Task ExportPreset()
+    {
+        if (SelectedPreset is null) return;
+
+        var path = await fileDialogService.SaveFileAsync();
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        presetService.Export(SelectedPreset, path);
     }
 }
