@@ -32,13 +32,16 @@ public class App : Application
 #endif
             Log.Logger = loggerConfig.CreateLogger();
 
+            var pandocCli = new PandocCli(new DocPreprocessorService());
+
             desktop.MainWindow.DataContext = new MainWindowViewModel(
                     new FileDialogService(desktop.MainWindow),
-                    new PandocCli(new DocPreprocessorService()),
+                    pandocCli,
                     dataDirService,
                     desktop.MainWindow.Clipboard ?? throw new InvalidOperationException("No application clipboard"),
                     new PandocEnvironmentService(),
-                    new PresetService(dataDirService.GetPath())
+                    new PresetService(dataDirService.GetPath()),
+                    new BatchConverter(pandocCli)
                 );
         }
 
