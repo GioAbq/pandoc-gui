@@ -37,7 +37,8 @@ public class App : Application
                     new PandocCli(new DocPreprocessorService()),
                     dataDirService,
                     desktop.MainWindow.Clipboard ?? throw new InvalidOperationException("No application clipboard"),
-                    new PandocEnvironmentService()
+                    new PandocEnvironmentService(),
+                    new PresetService(dataDirService.GetPath())
                 );
         }
 
