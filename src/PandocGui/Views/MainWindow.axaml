@@ -4,6 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:ui="using:FluentAvalonia.UI.Controls"
         xmlns:cli="using:PandocGui.CliWrapper"
+        xmlns:vm="using:PandocGui.ViewModels"
         xmlns:sys="using:System"
         xmlns:avaloniaProgressRing="clr-namespace:AvaloniaProgressRing;assembly=AvaloniaProgressRing"
         mc:Ignorable="d"
@@ -29,7 +30,9 @@
             </ui:FAInfoBar.ActionButton>
         </ui:FAInfoBar>
 
-        <Panel Margin="24">
+        <TabControl Margin="24">
+        <TabItem Header="Convert">
+        <Panel>
 
             <!-- EMPTY STATE: guiding drop zone -->
             <Border x:Name="emptyStatePanel"
@@ -182,5 +185,48 @@
                 </ScrollViewer>
             </DockPanel>
         </Panel>
+        </TabItem>
+
+        <TabItem Header="Batch">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+                    <Button x:Name="addBatchFilesButton" Content="Add files&#x2026;" />
+                    <Button x:Name="addBatchFolderButton" Content="Add folder&#x2026;" />
+                    <Button x:Name="removeBatchItemButton" Content="Remove" />
+                    <Button x:Name="clearBatchButton" Content="Clear" />
+                </StackPanel>
+
+                <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,8,0,0">
+                    <Grid ColumnDefinitions="Auto,160,*">
+                        <TextBlock Grid.Column="0" Text="Convert to" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <ComboBox x:Name="batchOutputFormatCombo" Grid.Column="1" HorizontalAlignment="Stretch">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="cli:OutputFormat">
+                                    <TextBlock Text="{Binding DisplayName}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBlock x:Name="batchSummaryText" Grid.Column="2" VerticalAlignment="Center"
+                                   HorizontalAlignment="Right" Opacity="0.7" />
+                    </Grid>
+                    <Button x:Name="convertBatchButton" Classes="accent" Content="Convert all"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                </StackPanel>
+
+                <Border BorderBrush="#33808080" BorderThickness="1" CornerRadius="4">
+                    <ListBox x:Name="batchList">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:BatchItem">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="{Binding FileName}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Status}" Opacity="0.7" Margin="8,0,0,0" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
+            </DockPanel>
+        </TabItem>
+        </TabControl>
     </DockPanel>
 </Window>

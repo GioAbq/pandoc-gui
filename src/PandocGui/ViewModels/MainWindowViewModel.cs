@@ -35,6 +35,11 @@ public partial class MainWindowViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> DeletePresetCommand { get; }
     public ReactiveCommand<Unit, Unit> ImportPresetCommand { get; }
     public ReactiveCommand<Unit, Unit> ExportPresetCommand { get; }
+    public ReactiveCommand<Unit, Unit> AddBatchFilesCommand { get; }
+    public ReactiveCommand<Unit, Unit> AddBatchFolderCommand { get; }
+    public ReactiveCommand<Unit, Unit> RemoveBatchItemCommand { get; }
+    public ReactiveCommand<Unit, Unit> ClearBatchCommand { get; }
+    public ReactiveCommand<Unit, Unit> ConvertBatchCommand { get; }
 
     [Reactive] public partial string SourcePath { get; set; }
 
@@ -71,6 +76,11 @@ public partial class MainWindowViewModel : ViewModelBase
     [Reactive] public partial string NewPresetName { get; set; }
     public ObservableCollection<Preset> Presets { get; } = new();
 
+    [Reactive] public partial BatchItem? SelectedBatchItem { get; set; }
+    [Reactive] public partial string BatchSummary { get; set; }
+    [Reactive] public partial bool HasBatchItems { get; set; }
+    public ObservableCollection<BatchItem> BatchItems { get; } = new();
+
     public List<string> SupportedEngine { get; } = PdfEnginePandocCommandGenerator.supportedEngines.ToList();
     public List<string> InstalledFonts { get; }
     public List<InputFormat> SupportedInputFormats { get; } = PandocFormats.InputFormats.ToList();
@@ -83,6 +93,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IClipboard clipboard;
     private readonly IPandocEnvironmentService pandocEnvironment;
     private readonly IPresetService presetService;
+    private readonly IBatchConverter batchConverter;
     private PandocStatus? lastStatus;
     private readonly ObservableAsPropertyHelper<bool> isExporting;
     public bool IsExporting => isExporting.Value;
@@ -93,7 +104,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public MainWindowViewModel(IFileDialogService fileDialogService, IPandocCli pandoc,
         IDataDirectoryService dataDirectoryService, IClipboard clipboard,
-        IPandocEnvironmentService pandocEnvironment, IPresetService presetService)
+        IPandocEnvironmentService pandocEnvironment, IPresetService presetService,
+        IBatchConverter batchConverter)
     {
         this.clipboard = clipboard;
         dataDirectoryService.EnsureCreated();
@@ -109,6 +121,7 @@ public partial class MainWindowViewModel : ViewModelBase
         PandocBannerMessage = "";
         PandocActionLabel = "";
         NewPresetName = "";
+        BatchSummary = "";
         SelectedInputFormat = SupportedInputFormats[0];
         SelectedOutputFormat = SupportedOutputFormats[0];
         this.fileDialogService = fileDialogService;
@@ -116,6 +129,7 @@ public partial class MainWindowViewModel : ViewModelBase
         this.dataDirectoryService = dataDirectoryService;
         this.pandocEnvironment = pandocEnvironment;
         this.presetService = presetService;
+        this.batchConverter = batchConverter;
         ClearCommand = ReactiveCommand.CreateFromTask(Clear);
         SearchSourceFileCommand = ReactiveCommand.CreateFromTask(SearchInputFile);
         SearchTargetFileCommand = ReactiveCommand.CreateFromTask(SearchOutputFile);
@@ -159,6 +173,24 @@ public partial class MainWindowViewModel : ViewModelBase
             .Subscribe(ApplyPreset);
 
         ReloadPresets();
+
+        var canConvertBatch = this.WhenAnyValue(
+            x => x.HasBatchItems,
+            x => x.IsPandocAvailable,
+            (hasItems, pandocAvailable) => hasItems && pandocAvailable);
+        var hasSelectedBatchItem = this.WhenAnyValue(x => x.SelectedBatchItem)
+            .Select(item => item is not null);
+        var canClearBatch = this.WhenAnyValue(x => x.HasBatchItems);
+        AddBatchFilesCommand = ReactiveCommand.CreateFromTask(AddBatchFiles);
+        AddBatchFolderCommand = ReactiveCommand.CreateFromTask(AddBatchFolder);
+        RemoveBatchItemCommand = ReactiveCommand.CreateFromTask(RemoveBatchItem, hasSelectedBatchItem);
+        ClearBatchCommand = ReactiveCommand.CreateFromTask(ClearBatch, canClearBatch);
+        ConvertBatchCommand = ReactiveCommand.CreateFromTask(ConvertBatch, canConvertBatch);
+        Observable.Merge(
+                AddBatchFilesCommand.ThrownExceptions,
+                AddBatchFolderCommand.ThrownExceptions,
+                ConvertBatchCommand.ThrownExceptions)
+            .Subscribe(ex => Log.Error(ex, "Batch operation failed"));
 
         this.WhenAnyValue(x => x.SourcePath)
             .Select(path => !string.IsNullOrWhiteSpace(path))
@@ -381,17 +413,18 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private async Task SearchInputFile()
     {
-        var groups = PandocFormats.InputFormats
+        SourcePath = await fileDialogService.OpenFileAsync(BuildInputGroups());
+        Console.WriteLine($"Source path : {SourcePath}");
+    }
+
+    private static List<FilePickerGroup> BuildInputGroups() =>
+        PandocFormats.InputFormats
             .Where(format => format.Extensions.Count > 0)
             .GroupBy(format => format.Category)
             .Select(group => new FilePickerGroup(
                 group.Key,
                 group.SelectMany(format => format.Extensions).Distinct().ToList()))
             .ToList();
-
-        SourcePath = await fileDialogService.OpenFileAsync(groups);
-        Console.WriteLine($"Source path : {SourcePath}");
-    }
 
     private async Task SearchOutputFile()
     {
@@ -509,5 +542,85 @@ public partial class MainWindowViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(path)) return;
 
         presetService.Export(SelectedPreset, path);
+    }
+
+    private async Task AddBatchFiles()
+    {
+        var paths = await fileDialogService.OpenFilesAsync(BuildInputGroups());
+        AddBatchPaths(paths);
+    }
+
+    private async Task AddBatchFolder()
+    {
+        var folder = await fileDialogService.OpenFolderAsync();
+        if (string.IsNullOrWhiteSpace(folder)) return;
+
+        AddBatchPaths(Directory.EnumerateFiles(folder).Where(PandocFormats.IsSupportedInput));
+    }
+
+    private void AddBatchPaths(IEnumerable<string> paths)
+    {
+        foreach (var path in paths)
+        {
+            if (BatchItems.Any(item => string.Equals(item.SourcePath, path, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            BatchItems.Add(new BatchItem(path));
+        }
+
+        UpdateBatchSummary();
+    }
+
+    private Task RemoveBatchItem()
+    {
+        if (SelectedBatchItem is not null)
+        {
+            BatchItems.Remove(SelectedBatchItem);
+        }
+
+        UpdateBatchSummary();
+        return Task.CompletedTask;
+    }
+
+    private Task ClearBatch()
+    {
+        BatchItems.Clear();
+        UpdateBatchSummary();
+        return Task.CompletedTask;
+    }
+
+    private async Task ConvertBatch()
+    {
+        if (BatchItems.Count == 0) return;
+
+        foreach (var item in BatchItems)
+        {
+            item.Status = "Pending";
+        }
+
+        var template = BuildPandocParameters();
+        template.LogToFile = false;
+        var sources = BatchItems.Select(item => item.SourcePath).ToList();
+        var progress = new Progress<BatchItemResult>(result =>
+        {
+            var item = BatchItems.FirstOrDefault(candidate => candidate.SourcePath == result.SourcePath);
+            if (item is not null)
+            {
+                item.Status = result.Success ? "Done" : $"Failed: {result.Error}";
+            }
+        });
+
+        var results = await batchConverter.ConvertAsync(sources, SelectedOutputFormat.Extension, template, progress);
+
+        var succeeded = results.Count(result => result.Success);
+        BatchSummary = $"{succeeded}/{results.Count} converted";
+    }
+
+    private void UpdateBatchSummary()
+    {
+        HasBatchItems = BatchItems.Count > 0;
+        BatchSummary = BatchItems.Count == 0 ? "" : $"{BatchItems.Count} file(s)";
     }
 }
