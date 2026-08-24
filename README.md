@@ -12,7 +12,7 @@ This software aims to provide a clean and modern GUI to generate PDF documents f
 - PDF Engine
 - Table of contents
 
-Pandoc GUI runs on .NET 6.
+Pandoc GUI runs on .NET 10.
 
 ## Screenshots
 
@@ -58,7 +58,7 @@ sudo installer -pkg BasicTeX.pkg -target /
  - [Download Installer from release](https://github.com/Ombrelin/pandoc-gui/releases/latest)
  - Just run the installer
 
-No need to install the .NET 6 Runtime, it has been bundled in the executable.
+No need to install the .NET 10 Runtime, it has been bundled in the executable.
 
 ### MacOS
 
@@ -70,7 +70,7 @@ WIP
 - `sudo dpkg -i <deb package>` to install the deb package
 - `PandocGui` to launch the app
 
-No need to install the .NET 6 Runtime, it has been bundled in the executable.
+No need to install the .NET 10 Runtime, it has been bundled in the executable.
 
 ## Run Dev
 
