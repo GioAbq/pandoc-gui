@@ -39,8 +39,16 @@ winget install Pandoc
 
 ### Linux
 
+#### Debian-based (apt)
+
 ```bash
-sudo apt-get install pandoc texlive-latex-extra texlive-latex-recommended
+sudo apt-get install pandoc texlive-latex-recommended texlive-latex-extra
+```
+
+#### Fedora-based (dnf)
+
+```bash
+sudo apt-get install pandoc-cli texlive-collection-latexrecommended texlive-collection-latexextra
 ```
 
 ### MacOs
