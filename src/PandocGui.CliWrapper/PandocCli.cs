@@ -86,7 +86,7 @@ public class PandocCli : IPandocCli
             throw new ArgumentException("Invalid parameters");
         }
 
-        IPandocCommandGenerator generator = new PandocCommandGenerator();
+        IPandocCommandGenerator generator = new PandocCommandGenerator(parameters.SourceFormat);
 
         if (parameters.HighlightTheme)
         {

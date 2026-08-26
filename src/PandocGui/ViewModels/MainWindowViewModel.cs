@@ -5,6 +5,7 @@ using System.Drawing.Text;
 using System.IO;
 using System.Linq;
 using System.Reactive;
+using System.Reactive.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Avalonia.Input.Platform;
@@ -31,6 +32,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [Reactive] public partial string TargetPath { get; set; }
 
+    [Reactive] public partial string SourceFormat { get; set; }
+    [Reactive] public partial OutputFormat SelectedOutputFormat { get; set; }
+
     [Reactive] public partial bool CustomHighlightThemeEnabled { get; set; }
 
     [Reactive] public partial string CustomHighlightThemeSource { get; set; }
@@ -48,6 +52,8 @@ public partial class MainWindowViewModel : ViewModelBase
     [Reactive] public partial bool OpenFileOnCompletion { get; set; }
     public List<string> SupportedEngine { get; } = PdfEnginePandocCommandGenerator.supportedEngines.ToList();
     public List<string> InstalledFonts { get; }
+    public List<string> SupportedInputFormats { get; } = PandocFormats.InputFormats.ToList();
+    public List<OutputFormat> SupportedOutputFormats { get; } = PandocFormats.OutputFormats.ToList();
 
 
     private readonly IFileDialogService fileDialogService;
@@ -70,17 +76,35 @@ public partial class MainWindowViewModel : ViewModelBase
         CustomPdfEngineValue = "";
         Result = "";
         OpenFileOnCompletion = true;
+        SourceFormat = PandocFormats.DefaultInputFormat;
+        SelectedOutputFormat = SupportedOutputFormats[0];
         this.fileDialogService = fileDialogService;
         this.pandoc = pandoc;
         this.dataDirectoryService = dataDirectoryService;
         ClearCommand = ReactiveCommand.CreateFromTask(Clear);
         SearchSourceFileCommand = ReactiveCommand.CreateFromTask(SearchInputFile);
         SearchTargetFileCommand = ReactiveCommand.CreateFromTask(SearchOutputFile);
-        ExportCommand = ReactiveCommand.CreateFromTask(Export);
+
+        var canExport = this.WhenAnyValue(
+            x => x.SourcePath,
+            x => x.TargetPath,
+            (source, target) => !string.IsNullOrWhiteSpace(source) && !string.IsNullOrWhiteSpace(target));
+        ExportCommand = ReactiveCommand.CreateFromTask(Export, canExport);
         CopyCommand = ReactiveCommand.CreateFromTask(CopyPandocToClipBoard);
         ExportCommand.IsExecuting.ToProperty(this, x => x.IsExporting, out isExporting);
         SearchHighlightThemeSourceCommand = ReactiveCommand.CreateFromTask(SearchHighlightThemeSource);
         OpenLogFolderCommand = ReactiveCommand.Create(dataDirectoryService.OpenLogFolder);
+
+        this.WhenAnyValue(x => x.SourcePath)
+            .Subscribe(path =>
+            {
+                if (string.IsNullOrWhiteSpace(path)) return;
+                SourceFormat = PandocFormats.DetectInputFormat(path);
+                SetTargetFromSource();
+            });
+        this.WhenAnyValue(x => x.SelectedOutputFormat)
+            .Skip(1)
+            .Subscribe(_ => SwapTargetExtension());
 
         InstalledFonts = GetInstalledFonts();
 
@@ -88,8 +112,29 @@ public partial class MainWindowViewModel : ViewModelBase
         var args = Environment.GetCommandLineArgs();
         if (args.Count() > 1 && File.Exists(args[1]))
         {
-            this.SourcePath= args[1];
+            this.SourcePath = args[1];
         }
+    }
+
+    private void SetTargetFromSource()
+    {
+        if (string.IsNullOrWhiteSpace(SourcePath)) return;
+        var directory = Path.GetDirectoryName(SourcePath) ?? "";
+        var name = Path.GetFileNameWithoutExtension(SourcePath);
+        TargetPath = Path.Combine(directory, name + SelectedOutputFormat.Extension);
+    }
+
+    private void SwapTargetExtension()
+    {
+        if (string.IsNullOrWhiteSpace(TargetPath))
+        {
+            SetTargetFromSource();
+            return;
+        }
+
+        var directory = Path.GetDirectoryName(TargetPath) ?? "";
+        var name = Path.GetFileNameWithoutExtension(TargetPath);
+        TargetPath = Path.Combine(directory, name + SelectedOutputFormat.Extension);
     }
 
     private static List<string> GetInstalledFonts() => SKFontManager.Default.FontFamilies.ToList();
@@ -131,6 +176,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             SourcePath = SourcePath,
             TargetPath = TargetPath,
+            SourceFormat = SourceFormat,
             HighlightTheme = CustomHighlightThemeEnabled,
             HighlightThemeSource = CustomHighlightThemeSource,
             NumberedHeader = NumberedHeadersEnabled,
@@ -163,6 +209,10 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         SourcePath = "";
         TargetPath = "";
+        SourceFormat = PandocFormats.DefaultInputFormat;
+        SelectedOutputFormat = SupportedOutputFormats[0];
+        Result = "";
+        IsError = false;
 
         CustomHighlightThemeEnabled = false;
         CustomHighlightThemeSource = "";

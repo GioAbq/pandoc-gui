@@ -4,6 +4,7 @@ public class PandocParameters
 {
     public string SourcePath { get; set; }
     public string TargetPath { get; set; }
+    public string SourceFormat { get; set; } = PandocFormats.DefaultInputFormat;
     public bool HighlightTheme { get; set; } = false;
     public string HighlightThemeSource { get; set; }
     public bool NumberedHeader { get; set; } = false;
@@ -19,6 +20,6 @@ public class PandocParameters
 
     public override string ToString()
     {
-        return $"{nameof(SourcePath)}: {SourcePath}, {nameof(TargetPath)}: {TargetPath}, {nameof(HighlightTheme)}: {HighlightTheme}, {nameof(HighlightThemeSource)}: {HighlightThemeSource}, {nameof(NumberedHeader)}: {NumberedHeader}, {nameof(CustomFont)}: {CustomFont}, {nameof(CustomFontName)}: {CustomFontName}, {nameof(CustomMargin)}: {CustomMargin}, {nameof(CustomMarginValue)}: {CustomMarginValue}, {nameof(CustomPdfEngine)}: {CustomPdfEngine}, {nameof(CustomPdfEngineValue)}: {CustomPdfEngineValue}, {nameof(TableOfContents)}: {TableOfContents}, {nameof(LogToFile)}: {LogToFile}, {nameof(LogFilePath)}: {LogFilePath}";
+        return $"{nameof(SourcePath)}: {SourcePath}, {nameof(TargetPath)}: {TargetPath}, {nameof(SourceFormat)}: {SourceFormat}, {nameof(HighlightTheme)}: {HighlightTheme}, {nameof(HighlightThemeSource)}: {HighlightThemeSource}, {nameof(NumberedHeader)}: {NumberedHeader}, {nameof(CustomFont)}: {CustomFont}, {nameof(CustomFontName)}: {CustomFontName}, {nameof(CustomMargin)}: {CustomMargin}, {nameof(CustomMarginValue)}: {CustomMarginValue}, {nameof(CustomPdfEngine)}: {CustomPdfEngine}, {nameof(CustomPdfEngineValue)}: {CustomPdfEngineValue}, {nameof(TableOfContents)}: {TableOfContents}, {nameof(LogToFile)}: {LogToFile}, {nameof(LogFilePath)}: {LogFilePath}";
     }
 }
