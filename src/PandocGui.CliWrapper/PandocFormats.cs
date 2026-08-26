@@ -11,7 +11,7 @@ public static class PandocFormats
 {
     public const string DefaultInputFormat = "markdown";
 
-    private static readonly Dictionary<string, string> InputFormatByExtension = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly IReadOnlyDictionary<string, string> InputFormatByExtension = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
         [".md"] = "markdown",
         [".markdown"] = "markdown",
