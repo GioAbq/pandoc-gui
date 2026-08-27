@@ -8,7 +8,6 @@ using System.Reactive;
 using System.Reactive.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using Avalonia.Input.Platform;
 using PandocGui.CliWrapper;
 using PandocGui.CliWrapper.Command;
 using PandocGui.Services;
@@ -59,12 +58,12 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IFileDialogService fileDialogService;
     private readonly IPandocCli pandoc;
     private readonly IDataDirectoryService dataDirectoryService;
-    private readonly IClipboard clipboard;
+    private readonly IClipboardService clipboard;
     private readonly ObservableAsPropertyHelper<bool> isExporting;
     public bool IsExporting => isExporting.Value;
 
     public MainWindowViewModel(IFileDialogService fileDialogService, IPandocCli pandoc,
-        IDataDirectoryService dataDirectoryService, IClipboard clipboard)
+        IDataDirectoryService dataDirectoryService, IClipboardService clipboard)
     {
         this.clipboard = clipboard;
         dataDirectoryService.EnsureCreated();
