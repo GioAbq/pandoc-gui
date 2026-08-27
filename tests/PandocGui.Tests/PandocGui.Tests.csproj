@@ -20,6 +20,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\PandocGui.CliWrapper\PandocGui.CliWrapper.csproj" />
+        <ProjectReference Include="..\..\src\PandocGui\PandocGui.csproj" />
     </ItemGroup>
 
 </Project>
