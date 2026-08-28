@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Reactive.Linq;
@@ -248,6 +248,46 @@ public class MainWindowViewModelTest
         Assert.False(viewModel.CustomPdfEngineEnabled);
         Assert.Equal("", viewModel.CustomPdfEngineValue);
         Assert.False(viewModel.TableOfContentEnabled);
+    }
+
+    [Fact]
+    public void HasInput_FollowsWhetherASourcePathIsSet()
+    {
+        // Given
+        var viewModel = BuildViewModel();
+        Assert.False(viewModel.HasInput);
+
+        // When
+        viewModel.SourcePath = Path.Combine("documents", "report.md");
+
+        // Then
+        Assert.True(viewModel.HasInput);
+
+        // And when
+        viewModel.SourcePath = "   ";
+
+        // Then
+        Assert.False(viewModel.HasInput);
+    }
+
+    [Fact]
+    public void IsStatusVisible_FollowsWhetherAResultIsSet()
+    {
+        // Given
+        var viewModel = BuildViewModel();
+        Assert.False(viewModel.IsStatusVisible);
+
+        // When
+        viewModel.Result = "Success";
+
+        // Then
+        Assert.True(viewModel.IsStatusVisible);
+
+        // And when
+        viewModel.Result = "";
+
+        // Then
+        Assert.False(viewModel.IsStatusVisible);
     }
 
     [Fact]
