@@ -13,6 +13,17 @@
         DragDrop.AllowDrop="True"
         Title="PandocGui">
 
+    <Window.Styles>
+        <!-- Without an explicit item template a ComboBox renders its selection blank. -->
+        <Style Selector="ComboBox">
+            <Setter Property="ItemTemplate">
+                <DataTemplate>
+                    <TextBlock Text="{Binding}" />
+                </DataTemplate>
+            </Setter>
+        </Style>
+    </Window.Styles>
+
     <DockPanel>
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="File">
