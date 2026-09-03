@@ -48,10 +48,9 @@ public class FileDialogService : IFileDialogService
 
     public async Task<string> SaveFileAsync()
     {
-        var dialog = new FilePickerSaveOptions();
         try
         {
-            var file = await window.StorageProvider.SaveFilePickerAsync(dialog);
+            var file = await window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions());
             return file?.TryGetLocalPath() ?? "";
         }
         catch (Exception)
